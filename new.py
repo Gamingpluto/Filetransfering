@@ -59,10 +59,12 @@ def index():
 
     <h2>📁 File Transfer System</h2>
 
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <button>Upload</button>
-    </form>
+    <<form id="uploadForm">
+    <input type="file" id="fileInput">
+    <button type="submit">Upload</button>
+</form>
+
+<p id="status"></p>
 
     <h3>Files:</h3>
     '''
