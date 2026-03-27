@@ -65,7 +65,7 @@ def index():
 </form>
 
 <p id="status"></p>
-
+<progress id="progressBar" value="0" max="100"></progress>
     <h3>Files:</h3>
     '''
 
@@ -82,6 +82,46 @@ def index():
             </a>
         </div>
         '''
+        <script>
+document.getElementById("uploadForm").onsubmit = async (e) => {
+    e.preventDefault();
+
+    let file = document.getElementById("fileInput").files[0];
+    let formData = new FormData();
+    formData.append("file", file);
+
+    document.getElementById("status").innerText = "Uploading...";
+
+    await fetch("/", {
+        method: "POST",
+        body: formData
+    });
+
+    document.getElementById("status").innerText = "Upload Done!";
+    loadFiles(); // refresh file list
+};
+</script>
+
+<script>
+document.getElementById("uploadForm").onsubmit = (e) => {
+    e.preventDefault();
+
+    let file = document.getElementById("fileInput").files[0];
+    let formData = new FormData();
+    formData.append("file", file);
+
+    let xhr = new XMLHttpRequest();
+
+    xhr.upload.onprogress = (e) => {
+        let percent = (e.loaded / e.total) * 100;
+        document.getElementById("progressBar").value = percent;
+    };
+
+    xhr.open("POST", "/");
+    xhr.send(formData);
+};
+</script>
+setInterval(loadFiles, 3000);
 
     # ✅ CLOSE HTML
     html += '''
@@ -97,6 +137,10 @@ def index():
 def download(filename):
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
+@app.route('/api/files')
+def api_files():
+    files = os.listdir(UPLOAD_FOLDER)
+    return {"files": files}
 
 @app.route('/delete/<filename>')
 def delete_file(filename):
@@ -104,6 +148,9 @@ def delete_file(filename):
     if os.path.exists(path):
         os.remove(path)
     return redirect('/')
+
+
+
 
 if __name__ == "__main__":
     app.run()
