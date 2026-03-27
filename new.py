@@ -1,20 +1,13 @@
-from flask import Flask, request, send_from_directory, redirect
+from flask import Flask, request, send_from_directory, jsonify
 import os
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
 def index():
-    if request.method == 'POST':
-        file = request.files['file']
-        if file:
-            file.save(os.path.join(UPLOAD_FOLDER, file.filename))
-
-    files = os.listdir(UPLOAD_FOLDER)
-
-    html = '''
+    return '''
     <html>
     <head>
     <title>File Transfer</title>
@@ -25,23 +18,6 @@ def index():
         background: #0f172a;
         color: white;
         text-align: center;
-    }
-
-    .container {
-        margin-top: 50px;
-    }
-
-    input, button {
-        padding: 10px;
-        margin: 10px;
-        border-radius: 8px;
-        border: none;
-    }
-
-    button {
-        background: #22c55e;
-        color: white;
-        cursor: pointer;
     }
 
     .file {
@@ -55,102 +31,81 @@ def index():
     </head>
 
     <body>
-    <div class="container">
 
-    <h2>📁 File Transfer System</h2>
+    <h2>📁 File Transfer</h2>
 
-    <<form id="uploadForm">
-    <input type="file" id="fileInput">
-    <button type="submit">Upload</button>
-</form>
+    <form id="uploadForm">
+        <input type="file" id="fileInput">
+        <button>Upload</button>
+    </form>
 
-<p id="status"></p>
-<progress id="progressBar" value="0" max="100"></progress>
+    <p id="status"></p>
+    <progress id="progressBar" value="0" max="100"></progress>
+
     <h3>Files:</h3>
-    '''
+    <div id="fileList"></div>
 
-    # ✅ LOOP INSIDE FUNCTION
-    for file in files:
-        path = os.path.join(UPLOAD_FOLDER, file)
-        size = os.path.getsize(path) // 1024
+    <script>
+    async function loadFiles() {
+        let res = await fetch('/api/files');
+        let data = await res.json();
 
-        html += f'''
-        <div class="file">
-            <a href="/download/{file}">{file}</a> ({size} KB)
-            <a href="/delete/{file}">
-                <button>Delete</button>
-            </a>
-        </div>
-        '''
-        <script>
-document.getElementById("uploadForm").onsubmit = async (e) => {
-    e.preventDefault();
+        let html = "";
+        data.files.forEach(file => {
+            html += `
+            <div class="file">
+                <a href="/download/${file}">${file}</a>
+            </div>`;
+        });
 
-    let file = document.getElementById("fileInput").files[0];
-    let formData = new FormData();
-    formData.append("file", file);
+        document.getElementById("fileList").innerHTML = html;
+    }
 
-    document.getElementById("status").innerText = "Uploading...";
+    document.getElementById("uploadForm").onsubmit = (e) => {
+        e.preventDefault();
 
-    await fetch("/", {
-        method: "POST",
-        body: formData
-    });
+        let file = document.getElementById("fileInput").files[0];
+        let formData = new FormData();
+        formData.append("file", file);
 
-    document.getElementById("status").innerText = "Upload Done!";
-    loadFiles(); // refresh file list
-};
-</script>
+        let xhr = new XMLHttpRequest();
 
-<script>
-document.getElementById("uploadForm").onsubmit = (e) => {
-    e.preventDefault();
+        xhr.upload.onprogress = (e) => {
+            let percent = (e.loaded / e.total) * 100;
+            document.getElementById("progressBar").value = percent;
+        };
 
-    let file = document.getElementById("fileInput").files[0];
-    let formData = new FormData();
-    formData.append("file", file);
+        xhr.onload = () => {
+            document.getElementById("status").innerText = "Upload Done!";
+            loadFiles();
+        };
 
-    let xhr = new XMLHttpRequest();
-
-    xhr.upload.onprogress = (e) => {
-        let percent = (e.loaded / e.total) * 100;
-        document.getElementById("progressBar").value = percent;
+        xhr.open("POST", "/upload");
+        xhr.send(formData);
     };
 
-    xhr.open("POST", "/");
-    xhr.send(formData);
-};
-</script>
-setInterval(loadFiles, 3000);
+    loadFiles();
+    setInterval(loadFiles, 3000);
+    </script>
 
-    # ✅ CLOSE HTML
-    html += '''
-    </div>
     </body>
     </html>
     '''
 
-    return html
+@app.route('/upload', methods=['POST'])
+def upload():
+    file = request.files['file']
+    if file:
+        file.save(os.path.join(UPLOAD_FOLDER, file.filename))
+    return "OK"
 
+@app.route('/api/files')
+def api_files():
+    return jsonify({"files": os.listdir(UPLOAD_FOLDER)})
 
 @app.route('/download/<filename>')
 def download(filename):
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
-
-@app.route('/api/files')
-def api_files():
-    files = os.listdir(UPLOAD_FOLDER)
-    return {"files": files}
-
-@app.route('/delete/<filename>')
-def delete_file(filename):
-    path = os.path.join(UPLOAD_FOLDER, filename)
-    if os.path.exists(path):
-        os.remove(path)
-    return redirect('/')
-
-
-
 
 if __name__ == "__main__":
     app.run()
